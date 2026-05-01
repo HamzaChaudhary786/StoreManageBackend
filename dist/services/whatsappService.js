@@ -1,47 +1,37 @@
 "use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.sendUdharReminder = void 0;
-const axios_1 = __importDefault(require("axios"));
-const WHATSAPP_API_URL = `https://graph.facebook.com/v17.0/${process.env.WHATSAPP_PHONE_NUMBER_ID}/messages`;
-const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN;
-const sendUdharReminder = async (phone, name, balance, paymentLink) => {
-    if (!WHATSAPP_TOKEN) {
-        console.warn("WhatsApp Token not set. Skipping message to", phone);
-        return;
+exports.WhatsAppService = void 0;
+/**
+ * WhatsApp Service using Twilio or Meta API placeholder
+ * To use Twilio:
+ * - ACCOUNT_SID
+ * - AUTH_TOKEN
+ * - FROM_NUMBER (whatsapp:+14155238886)
+ */
+class WhatsAppService {
+    static async sendUdharReminder(phone, name, amount) {
+        const message = `Hello ${name}, your total udhar at FreshMart is Rs. ${amount.toFixed(2)}. Please clear your dues. Thank you!`;
+        console.log(`[WhatsApp] Sending to ${phone}: ${message}`);
+        // Example Twilio integration
+        /*
+        const accountSid = process.env.TWILIO_ACCOUNT_SID;
+        const authToken = process.env.TWILIO_AUTH_TOKEN;
+        const client = require('twilio')(accountSid, authToken);
+    
+        try {
+          await client.messages.create({
+            body: message,
+            from: 'whatsapp:+14155238886', // Twilio Sandbox or registered number
+            to: `whatsapp:${phone}`
+          });
+          return true;
+        } catch (error) {
+          console.error("WhatsApp Send Failed:", error);
+          return false;
+        }
+        */
+        return true; // Mock success
     }
-    try {
-        await axios_1.default.post(WHATSAPP_API_URL, {
-            messaging_product: 'whatsapp',
-            to: phone,
-            type: 'template',
-            template: {
-                name: 'udhar_monthly_reminder', // Ensure this matches Meta Business Manager
-                language: { code: 'en_US' },
-                components: [
-                    {
-                        type: 'body',
-                        parameters: [
-                            { type: 'text', text: name },
-                            { type: 'text', text: balance.toFixed(2) },
-                            { type: 'text', text: paymentLink }
-                        ]
-                    }
-                ]
-            }
-        }, {
-            headers: {
-                Authorization: `Bearer ${WHATSAPP_TOKEN}`,
-                'Content-Type': 'application/json'
-            }
-        });
-        console.log(`WhatsApp reminder sent successfully to ${phone}`);
-    }
-    catch (error) {
-        console.error('Error sending WhatsApp reminder:', error.response?.data || error.message);
-    }
-};
-exports.sendUdharReminder = sendUdharReminder;
+}
+exports.WhatsAppService = WhatsAppService;
 //# sourceMappingURL=whatsappService.js.map

@@ -4,7 +4,14 @@ exports.createCategory = exports.getCategories = void 0;
 const server_1 = require("../server");
 const catchAsync_1 = require("../utils/catchAsync");
 exports.getCategories = (0, catchAsync_1.catchAsync)(async (req, res) => {
-    const categories = await server_1.prisma.category.findMany();
+    const categories = await server_1.prisma.category.findMany({
+        include: {
+            _count: {
+                select: { products: true }
+            }
+        },
+        orderBy: { name: 'asc' }
+    });
     res.json(categories);
 });
 exports.createCategory = (0, catchAsync_1.catchAsync)(async (req, res) => {

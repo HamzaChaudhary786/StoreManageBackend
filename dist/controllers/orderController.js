@@ -1,85 +1,107 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.createOrder = void 0;
+exports.getSalesHistory = exports.createSale = void 0;
 const server_1 = require("../server");
 const catchAsync_1 = require("../utils/catchAsync");
-exports.createOrder = (0, catchAsync_1.catchAsync)(async (req, res) => {
-    const { items, paymentMethod } = req.body;
-    const userId = req.user.id;
+/**
+ * Historical Order Controller (Refactored for Udhar Transactions)
+ * This controller now manages Udhar sales for customers.
+ */
+exports.createSale = (0, catchAsync_1.catchAsync)(async (req, res) => {
+    const { customerId, items, description, isUdhar } = req.body; // isUdhar: boolean
     if (!items || items.length === 0) {
         res.status(400);
-        throw new Error('No order items');
+        throw new Error('No items in sale');
     }
-    // Calculate total amount
     let totalAmount = 0;
     for (const item of items) {
-        const product = await server_1.prisma.product.findUnique({ where: { id: item.productId } });
-        if (!product)
-            throw new Error(`Product not found: ${item.productId}`);
-        totalAmount += product.price * item.quantity;
+        totalAmount += item.quantity * item.priceAtTime;
     }
-    // Handle Udhar Logic
-    if (paymentMethod === 'UDHAR') {
-        const user = await server_1.prisma.user.findUnique({ where: { id: userId } });
-        if (!user)
-            throw new Error('User not found');
-        if (user.currentBalance + totalAmount > user.creditLimit) {
-            res.status(400);
-            throw new Error(`Credit limit exceeded. Your available credit is $${user.creditLimit - user.currentBalance}`);
-        }
-        // Update user balance
-        await server_1.prisma.user.update({
-            where: { id: userId },
-            data: { currentBalance: user.currentBalance + totalAmount }
-        });
-    }
-    // Create Order
-    const order = await server_1.prisma.order.create({
-        data: {
-            userId,
-            totalAmount,
-            paymentMethod,
-            items: {
-                create: items.map((item) => ({
-                    productId: item.productId,
-                    quantity: item.quantity,
-                    price: item.price
-                }))
-            }
-        }
-    });
-    // Record Udhar Transaction
-    if (paymentMethod === 'UDHAR') {
-        await server_1.prisma.udharTransaction.create({
-            data: {
-                userId,
-                amount: totalAmount,
-                type: 'CREDIT',
-                description: 'Purchase on credit',
-                orderId: order.id
-            }
-        });
-    }
-    // Update Product Stock and check for Low Stock
-    for (const item of items) {
-        const updatedProduct = await server_1.prisma.product.update({
-            where: { id: item.productId },
-            data: {
-                stock: {
-                    decrement: item.quantity
-                }
-            }
-        });
-        if (updatedProduct.stock < 10) {
-            await server_1.prisma.adminNotification.create({
+    const transaction = await server_1.prisma.$transaction(async (tx) => {
+        let sale;
+        if (isUdhar) {
+            if (!customerId)
+                throw new Error('Customer ID is required for Udhar sale');
+            sale = await tx.udharTransaction.create({
                 data: {
-                    title: 'Low Stock Alert',
-                    message: `Product "${updatedProduct.name}" is running low on stock. Only ${updatedProduct.stock} left.`,
-                    type: 'LOW_STOCK'
+                    customerId,
+                    totalAmount,
+                    description: description || 'POS Udhar Sale',
+                    items: {
+                        create: items.map((i) => ({
+                            productId: i.productId,
+                            quantity: i.quantity,
+                            priceAtTime: i.priceAtTime
+                        }))
+                    }
+                }
+            });
+            // Update Customer Balance
+            await tx.customer.update({
+                where: { id: customerId },
+                data: { currentBalance: { increment: totalAmount } }
+            });
+        }
+        else {
+            // Cash Sale
+            sale = await tx.order.create({
+                data: {
+                    totalAmount,
+                    items: {
+                        create: items.map((i) => ({
+                            productId: i.productId,
+                            quantity: i.quantity,
+                            priceAtTime: i.priceAtTime
+                        }))
+                    }
                 }
             });
         }
-    }
-    res.status(201).json(order);
+        // 3. Validate & Update Product Stocks + Log
+        for (const item of items) {
+            const product = await tx.product.findUnique({ where: { id: item.productId } });
+            if (!product)
+                throw new Error(`Product not found: ${item.productId}`);
+            // ✅ Negative stock guard
+            if (product.stock < item.quantity) {
+                throw new Error(`Insufficient stock for "${product.name}". Available: ${product.stock.toFixed(2)} ${product.unit}, Requested: ${item.quantity}`);
+            }
+            await tx.product.update({
+                where: { id: item.productId },
+                data: { stock: { decrement: item.quantity } }
+            });
+            await tx.stockLog.create({
+                data: {
+                    productId: item.productId,
+                    change: -item.quantity,
+                    previous: product.stock,
+                    current: product.stock - item.quantity,
+                    reason: isUdhar ? `UDHAR_SALE_${sale.id}` : `CASH_SALE_${sale.id}`
+                }
+            });
+            // Low stock notification
+            if (product.stock - item.quantity <= product.minStockLevel) {
+                await tx.adminNotification.create({
+                    data: {
+                        title: 'Low Stock Alert',
+                        message: `"${product.name}" is running low. Only ${(product.stock - item.quantity).toFixed(2)} ${product.unit} left.`,
+                        type: 'LOW_STOCK'
+                    }
+                });
+            }
+        }
+        return sale;
+    });
+    res.status(201).json(transaction);
+});
+exports.getSalesHistory = (0, catchAsync_1.catchAsync)(async (req, res) => {
+    const transactions = await server_1.prisma.udharTransaction.findMany({
+        include: {
+            customer: { select: { name: true, phone: true } },
+            items: { include: { product: { select: { name: true } } } }
+        },
+        orderBy: { createdAt: 'desc' }
+    });
+    res.json(transactions);
 });
 //# sourceMappingURL=orderController.js.map

@@ -7,10 +7,14 @@ exports.prisma = void 0;
 const app_1 = __importDefault(require("./app"));
 const dotenv_1 = __importDefault(require("dotenv"));
 const client_1 = require("@prisma/client");
+const adapter_pg_1 = require("@prisma/adapter-pg");
+const pg_1 = require("pg");
 const cronJobs_1 = require("./jobs/cronJobs");
 dotenv_1.default.config();
 const PORT = process.env.PORT || 5000;
-exports.prisma = new client_1.PrismaClient();
+const pool = new pg_1.Pool({ connectionString: process.env.DATABASE_URL });
+const adapter = new adapter_pg_1.PrismaPg(pool);
+exports.prisma = new client_1.PrismaClient({ adapter });
 const startServer = async () => {
     try {
         await exports.prisma.$connect();
@@ -27,5 +31,8 @@ const startServer = async () => {
         process.exit(1);
     }
 };
-startServer();
+// Prevent server from starting locally if running in Vercel
+if (process.env.VERCEL !== '1') {
+    startServer();
+}
 //# sourceMappingURL=server.js.map

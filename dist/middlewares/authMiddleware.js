@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.authorize = exports.protect = void 0;
+exports.authorizeAdmin = exports.protect = void 0;
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const server_1 = require("../server");
 const catchAsync_1 = require("../utils/catchAsync");
@@ -18,15 +18,15 @@ exports.protect = (0, catchAsync_1.catchAsync)(async (req, res, next) => {
     }
     try {
         const decoded = jsonwebtoken_1.default.verify(token, process.env.JWT_SECRET);
-        const user = await server_1.prisma.user.findUnique({
+        const admin = await server_1.prisma.admin.findUnique({
             where: { id: decoded.id },
-            select: { id: true, name: true, email: true, role: true }
+            select: { id: true, name: true, email: true }
         });
-        if (!user) {
+        if (!admin) {
             res.status(401);
-            throw new Error('Not authorized, user not found');
+            throw new Error('Not authorized, admin not found');
         }
-        req.user = user;
+        req.user = { ...admin, role: 'ADMIN' };
         next();
     }
     catch (error) {
@@ -34,14 +34,13 @@ exports.protect = (0, catchAsync_1.catchAsync)(async (req, res, next) => {
         throw new Error('Not authorized, token failed');
     }
 });
-const authorize = (...roles) => {
-    return (req, res, next) => {
-        if (!req.user || !roles.includes(req.user.role)) {
-            res.status(403);
-            return next(new Error(`User role ${req.user?.role} is not authorized to access this route`));
-        }
-        next();
-    };
+// Simplified authorize for admin only
+const authorizeAdmin = (req, res, next) => {
+    if (!req.user || req.user.role !== 'ADMIN') {
+        res.status(403);
+        return next(new Error('Not authorized as an admin'));
+    }
+    next();
 };
-exports.authorize = authorize;
+exports.authorizeAdmin = authorizeAdmin;
 //# sourceMappingURL=authMiddleware.js.map

@@ -12,17 +12,14 @@ const setupCronJobs = () => {
     node_cron_1.default.schedule('0 10 1 * *', async () => {
         console.log('Running monthly Udhar reminder cron job...');
         try {
-            const usersWithBalance = await server_1.prisma.user.findMany({
+            const customersWithBalance = await server_1.prisma.customer.findMany({
                 where: { currentBalance: { gt: 0 } },
-                select: { name: true, email: true, currentBalance: true, id: true }
+                select: { name: true, phone: true, currentBalance: true, id: true }
             });
-            for (const user of usersWithBalance) {
-                const paymentLink = `${process.env.FRONTEND_URL}/pay-udhar/${user.id}`;
-                // In production, fetch actual phone number from user record
-                const userPhone = "1234567890";
-                await (0, whatsappService_1.sendUdharReminder)(userPhone, user.name, user.currentBalance, paymentLink);
+            for (const customer of customersWithBalance) {
+                await whatsappService_1.WhatsAppService.sendUdharReminder(customer.phone, customer.name, customer.currentBalance);
             }
-            console.log('Monthly Udhar reminders sent successfully.');
+            console.log(`Monthly Udhar reminders sent to ${customersWithBalance.length} customers.`);
         }
         catch (error) {
             console.error('Error in monthly Udhar reminder cron job:', error);

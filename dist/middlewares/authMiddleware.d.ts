@@ -7,5 +7,5 @@ declare global {
     }
 }
 export declare const protect: (req: Request, res: Response, next: NextFunction) => void;
-export declare const authorize: (...roles: string[]) => (req: Request, res: Response, next: NextFunction) => void;
+export declare const authorizeAdmin: (req: Request, res: Response, next: NextFunction) => void;
 //# sourceMappingURL=authMiddleware.d.ts.map

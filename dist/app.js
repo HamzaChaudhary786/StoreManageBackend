@@ -12,9 +12,9 @@ const errorMiddleware_1 = require("./middlewares/errorMiddleware");
 const authRoutes_1 = __importDefault(require("./routes/authRoutes"));
 const productRoutes_1 = __importDefault(require("./routes/productRoutes"));
 const categoryRoutes_1 = __importDefault(require("./routes/categoryRoutes"));
-const orderRoutes_1 = __importDefault(require("./routes/orderRoutes"));
-const userRoutes_1 = __importDefault(require("./routes/userRoutes"));
+const customerRoutes_1 = __importDefault(require("./routes/customerRoutes"));
 const adminRoutes_1 = __importDefault(require("./routes/adminRoutes"));
+const orderRoutes_1 = __importDefault(require("./routes/orderRoutes"));
 const app = (0, express_1.default)();
 // Middlewares
 app.use(express_1.default.json());
@@ -28,15 +28,15 @@ app.use((0, morgan_1.default)('dev'));
 app.use((0, cookie_parser_1.default)());
 // Health Check
 app.get('/api/health', (req, res) => {
-    res.status(200).json({ status: 'ok', message: 'Backend is running smoothly' });
+    res.status(200).json({ status: 'ok', message: 'Inventory System Backend is running' });
 });
-// Setup Routes here...
+// Routes
 app.use('/api/auth', authRoutes_1.default);
 app.use('/api/products', productRoutes_1.default);
 app.use('/api/categories', categoryRoutes_1.default);
-app.use('/api/orders', orderRoutes_1.default);
-app.use('/api/users', userRoutes_1.default);
+app.use('/api/customers', customerRoutes_1.default);
 app.use('/api/admin', adminRoutes_1.default);
+app.use('/api/orders', orderRoutes_1.default);
 // Error Middlewares
 app.use(errorMiddleware_1.notFound);
 app.use(errorMiddleware_1.errorHandler);
