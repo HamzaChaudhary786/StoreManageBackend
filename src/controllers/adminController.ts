@@ -47,15 +47,15 @@ export const getDashboardStats = catchAsync(async (req: Request, res: Response) 
   ]);
 
   // ✅ Correct stock value: cost per retail unit × stock
-  const totalStockValue = products.reduce((acc, p) => {
+  const totalStockValue = products.reduce((acc: number, p: any) => {
     const costPerUnit = p.piecesPerUnit > 1 ? p.buyPrice / p.piecesPerUnit : p.buyPrice;
     return acc + costPerUnit * p.stock;
   }, 0);
 
   // ✅ Today's Revenue: cash + udhar
   const todayRevenue =
-    todayCashOrders.reduce((s, o) => s + o.totalAmount, 0) +
-    todayUdharSales.reduce((s, t) => s + t.totalAmount, 0);
+    todayCashOrders.reduce((s: number, o: any) => s + o.totalAmount, 0) +
+    todayUdharSales.reduce((s: number, t: any) => s + t.totalAmount, 0);
 
   // ✅ Today's Profit: revenue - cost of goods sold
   const calcProfit = (orders: any[]) =>
@@ -69,7 +69,7 @@ export const getDashboardStats = catchAsync(async (req: Request, res: Response) 
 
   // ✅ Low stock (runtime filter using minStockLevel per product)
   const lowStockCount = (await prisma.product.findMany({ select: { stock: true, minStockLevel: true } }))
-    .filter(p => p.stock > 0 && p.stock <= (p.minStockLevel || 5)).length;
+    .filter((p: any) => p.stock > 0 && p.stock <= (p.minStockLevel || 5)).length;
 
   // ✅ Combined recent activity
   const recentActivity = [
@@ -115,23 +115,23 @@ export const getSalesReportData = catchAsync(async (req: Request, res: Response)
   ]);
 
   const allSales = [
-    ...cashSales.map(s => ({
+    ...cashSales.map((s: any) => ({
       id: s.id,
       date: s.createdAt,
       type: 'CASH',
       customer: 'Walk-in',
       total: s.totalAmount,
       profit: calcSaleProfit(s.items as unknown as OrderItem[]),
-      items: s.items.map(i => `${i.product.name} (${i.quantity} ${i.product.unit})`).join(', ')
+      items: s.items.map((i: any) => `${i.product.name} (${i.quantity} ${i.product.unit})`).join(', ')
     })),
-    ...udharSales.map(s => ({
+    ...udharSales.map((s: any) => ({
       id: s.id,
       date: s.createdAt,
       type: 'UDHAR',
       customer: s.customer.name,
       total: s.totalAmount,
       profit: calcSaleProfit(s.items as unknown as OrderItem[]),
-      items: s.items.map(i => `${i.product.name} (${i.quantity} ${i.product.unit})`).join(', ')
+      items: s.items.map((i: any) => `${i.product.name} (${i.quantity} ${i.product.unit})`).join(', ')
     }))
   ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
@@ -183,24 +183,24 @@ export const exportSalesReport = catchAsync(async (req: Request, res: Response) 
   ];
 
   // Cash Sales
-  cashSales.forEach(order => {
+  cashSales.forEach((order: any) => {
     sheet.addRow({
       date: order.createdAt.toLocaleString(),
       type: 'CASH',
       customer: 'Walk-in',
-      items: order.items.map(i => `${i.product.name} (${i.quantity} ${i.product.unit})`).join(', '),
+      items: order.items.map((i: any) => `${i.product.name} (${i.quantity} ${i.product.unit})`).join(', '),
       total: order.totalAmount,
       profit: calcSaleProfit(order.items as unknown as OrderItem[])
     });
   });
 
   // Udhar Sales
-  udharSales.forEach(tx => {
+  udharSales.forEach((tx: any) => {
     sheet.addRow({
       date: tx.createdAt.toLocaleString(),
       type: 'UDHAR',
       customer: tx.customer.name,
-      items: tx.items.map(i => `${i.product.name} (${i.quantity} ${i.product.unit})`).join(', '),
+      items: tx.items.map((i: any) => `${i.product.name} (${i.quantity} ${i.product.unit})`).join(', '),
       total: tx.totalAmount,
       profit: calcSaleProfit(tx.items as unknown as OrderItem[])
     });
@@ -238,7 +238,7 @@ export const getInventoryValue = catchAsync(async (req: Request, res: Response) 
     orderBy: { name: 'asc' }
   });
 
-  const detailedValue = products.map(p => {
+  const detailedValue = products.map((p: any) => {
     const costPerUnit = p.piecesPerUnit > 1 ? p.buyPrice / p.piecesPerUnit : p.buyPrice;
     const value = costPerUnit * p.stock;
     return {
@@ -253,7 +253,7 @@ export const getInventoryValue = catchAsync(async (req: Request, res: Response) 
     };
   });
 
-  const grandTotal = detailedValue.reduce((sum, item) => sum + item.value, 0);
+  const grandTotal = detailedValue.reduce((sum: number, item: any) => sum + item.value, 0);
 
   res.json({
     products: detailedValue,

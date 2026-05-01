@@ -51,7 +51,7 @@ export const addUdharTransaction = catchAsync(async (req: Request, res: Response
     totalAmount += item.quantity * item.priceAtTime;
   }
 
-  const transaction = await prisma.$transaction(async (tx) => {
+  const transaction = await prisma.$transaction(async (tx: any) => {
     // 1. Create Transaction
     const t = await tx.udharTransaction.create({
       data: {
@@ -103,7 +103,7 @@ export const addUdharTransaction = catchAsync(async (req: Request, res: Response
 export const payUdhar = catchAsync(async (req: Request, res: Response) => {
   const { customerId, amount, note } = req.body;
 
-  await prisma.$transaction(async (tx) => {
+  await prisma.$transaction(async (tx: any) => {
     // Decrement balance
     await tx.customer.update({ where: { id: customerId }, data: { currentBalance: { decrement: parseFloat(amount) } } });
 
@@ -126,7 +126,7 @@ export const revertTransaction = catchAsync(async (req: Request, res: Response) 
 
   if (!transaction) { res.status(404); throw new Error('Transaction not found'); }
 
-  await prisma.$transaction(async (tx) => {
+  await prisma.$transaction(async (tx: any) => {
     // 1. Restore Stock
     for (const item of transaction.items) {
       await tx.product.update({ where: { id: item.productId }, data: { stock: { increment: item.quantity } } });
