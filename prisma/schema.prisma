@@ -1,0 +1,130 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Admin {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Category {
+  id          String    @id @default(uuid())
+  name        String    @unique
+  description String?
+  products    Product[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Product {
+  id             String      @id @default(uuid())
+  name           String
+  description    String?
+  sku            String?     @unique
+  buyPrice       Float
+  salePrice      Float
+  unit           String      @default("pcs") // e.g., kg, pcs, liter, packet
+  piecesPerUnit  Int         @default(1)     // e.g., 100 toffees in 1 box
+  stock          Float       @default(0.0)
+  minStockLevel  Float       @default(5.0)
+  images         String[]    // Array of Cloudinary URLs
+  categoryId     String
+  category       Category    @relation(fields: [categoryId], references: [id])
+  stockLogs      StockLog[]
+  udharItems     UdharItem[]
+  orderItems     OrderItem[]
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+}
+
+model Customer {
+  id                String             @id @default(uuid())
+  name              String
+  phone             String             @unique
+  address           String?
+  currentBalance    Float              @default(0.0)
+  udharTransactions UdharTransaction[]
+  paymentLogs       PaymentLog[]
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+}
+
+model UdharTransaction {
+  id          String      @id @default(uuid())
+  customerId  String
+  customer    Customer    @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  totalAmount Float
+  description String?
+  items       UdharItem[]
+  isPaid      Boolean     @default(false)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+model UdharItem {
+  id                 String           @id @default(uuid())
+  udharTransactionId String
+  udharTransaction   UdharTransaction @relation(fields: [udharTransactionId], references: [id], onDelete: Cascade)
+  productId          String
+  product            Product          @relation(fields: [productId], references: [id])
+  quantity           Float
+  priceAtTime        Float
+}
+
+model Order {
+  id          String      @id @default(uuid())
+  totalAmount Float
+  items       OrderItem[]
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+model OrderItem {
+  id          String   @id @default(uuid())
+  orderId     String
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id])
+  quantity    Float
+  priceAtTime Float
+}
+
+model StockLog {
+  id        String   @id @default(uuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  change    Float      // Positive for added, negative for removed
+  previous  Float
+  current   Float
+  reason    String   // e.g., "PURCHASE", "AUDIT", "UDHAR"
+  createdAt DateTime @default(now())
+}
+
+model AdminNotification {
+  id        String   @id @default(uuid())
+  title     String
+  message   String
+  isRead    Boolean  @default(false)
+  type      String   @default("LOW_STOCK")
+  createdAt DateTime @default(now())
+}
+
+model PaymentLog {
+  id         String   @id @default(uuid())
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  amount     Float
+  note       String?
+  createdAt  DateTime @default(now())
+}
