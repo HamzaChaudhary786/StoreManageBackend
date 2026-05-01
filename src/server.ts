@@ -30,4 +30,7 @@ const startServer = async () => {
   }
 };
 
-startServer();
+// Prevent server from starting locally if running in Vercel
+if (process.env.VERCEL !== '1') {
+  startServer();
+}
