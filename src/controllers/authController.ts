@@ -29,8 +29,8 @@ export const login = catchAsync(async (req: Request, res: Response, next: NextFu
   });
   
   res.status(200).json({
-    user: { id: admin.id, name: admin.name, email: admin.email, role: 'ADMIN' },
-    accessToken
+    admin: { id: admin.id, name: admin.name, email: admin.email, role: 'ADMIN' },
+    token: accessToken
   });
 });
 

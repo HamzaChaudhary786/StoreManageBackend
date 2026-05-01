@@ -20,10 +20,7 @@ app.use(cors({
   origin: true, // Allow all origins to connect (necessary for mobile apps)
   credentials: true
 }));
-app.use(helmet({
-  crossOriginResourcePolicy: false,
-  contentSecurityPolicy: false,
-}));
+app.use(helmet());
 app.use(morgan('dev'));
 app.use(cookieParser());
 
