@@ -218,3 +218,29 @@ export const deleteCustomer = catchAsync(async (req: Request, res: Response) => 
 
   res.status(204).json({ status: 'success' });
 });
+export const updateCustomer = catchAsync(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { name, phone, address } = req.body;
+
+  const customer = await prisma.customer.findUnique({ where: { id } });
+  if (!customer) {
+    res.status(404);
+    throw new Error('Customer not found');
+  }
+
+  // If phone is being changed, check if new phone already exists
+  if (phone && phone !== customer.phone) {
+    const existing = await prisma.customer.findUnique({ where: { phone } });
+    if (existing) {
+      res.status(400);
+      throw new Error('Another customer already has this phone number');
+    }
+  }
+
+  const updated = await prisma.customer.update({
+    where: { id },
+    data: { name, phone, address }
+  });
+
+  res.json(updated);
+});
