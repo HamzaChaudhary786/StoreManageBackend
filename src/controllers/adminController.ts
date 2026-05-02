@@ -227,10 +227,25 @@ export const exportSalesReport = catchAsync(async (req: Request, res: Response) 
 export const getNotifications = catchAsync(async (req: Request, res: Response) => {
   const notifications = await prisma.adminNotification.findMany({
     orderBy: { createdAt: 'desc' },
-    take: 20
+    take: 30
   });
   res.json(notifications);
 });
+
+export const markAsRead = catchAsync(async (req: Request, res: Response) => {
+  await prisma.adminNotification.update({
+    where: { id: req.params.id },
+    data: { isRead: true }
+  });
+  res.json({ success: true });
+});
+
+// Helper for other controllers
+export const createNotification = async (title: string, message: string, type: string = 'LOW_STOCK') => {
+  return await prisma.adminNotification.create({
+    data: { title, message, type }
+  });
+};
 
 export const getInventoryValue = catchAsync(async (req: Request, res: Response) => {
   const products = await prisma.product.findMany({

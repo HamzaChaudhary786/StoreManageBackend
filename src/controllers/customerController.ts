@@ -44,12 +44,14 @@ export const createCustomer = catchAsync(async (req: Request, res: Response) => 
 });
 
 export const addUdharTransaction = catchAsync(async (req: Request, res: Response) => {
-  const { customerId, items, description } = req.body;
+  const { customerId, items, description, paidAmount = 0 } = req.body;
   
   let totalAmount = 0;
   for (const item of items) {
     totalAmount += item.quantity * item.priceAtTime;
   }
+
+  const remainingAmount = totalAmount - paidAmount;
 
   const transaction = await prisma.$transaction(async (tx: any) => {
     // 1. Create Transaction
@@ -68,20 +70,56 @@ export const addUdharTransaction = catchAsync(async (req: Request, res: Response
       }
     });
 
-    // 2. Update Customer Balance
-    await tx.customer.update({ where: { id: customerId }, data: { currentBalance: { increment: totalAmount } } });
+    // 2. Update Customer Balance (only by the remaining amount)
+    await tx.customer.update({ 
+      where: { id: customerId }, 
+      data: { currentBalance: { increment: remainingAmount } } 
+    });
 
-    // 3. Validate Stock & Deduct
+    // 3. Log initial payment if any
+    if (paidAmount > 0) {
+      await tx.paymentLog.create({
+        data: {
+          customerId,
+          amount: paidAmount,
+          note: `Initial payment for purchase: ${description || 'Udhar Sale'}`
+        }
+      });
+    }
+
+    // 4. Validate Stock & Deduct
     for (const item of items) {
       const product = await tx.product.findUnique({ where: { id: item.productId } });
       if (!product) throw new Error(`Product not found: ${item.productId}`);
 
-      // ✅ Negative stock guard
       if (product.stock < item.quantity) {
         throw new Error(`Insufficient stock for "${product.name}". Available: ${product.stock.toFixed(2)} ${product.unit}`);
       }
 
       await tx.product.update({ where: { id: item.productId }, data: { stock: { decrement: item.quantity } } });
+
+      // Check for low stock and notify
+      const updatedProduct = await tx.product.findUnique({ where: { id: item.productId } });
+      if (updatedProduct && updatedProduct.stock <= (updatedProduct.minStockLevel || 5)) {
+        // Check if a notification was already sent recently (to avoid spam)
+        const recentNotify = await tx.adminNotification.findFirst({
+          where: { 
+            type: 'LOW_STOCK', 
+            message: { contains: updatedProduct.name },
+            createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } // 24 hours
+          }
+        });
+
+        if (!recentNotify) {
+          await tx.adminNotification.create({
+            data: {
+              title: 'Low Stock Alert ⚠️',
+              message: `${updatedProduct.name} is running low (${updatedProduct.stock.toFixed(2)} ${updatedProduct.unit} left)`,
+              type: 'LOW_STOCK'
+            }
+          });
+        }
+      }
 
       await tx.stockLog.create({
         data: {
