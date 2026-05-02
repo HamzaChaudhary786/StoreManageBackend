@@ -1,5 +1,5 @@
 import cron from 'node-cron';
-import { prisma } from '../server';
+import { prisma } from '../lib/prisma';
 import { WhatsAppService } from '../services/whatsappService';
 
 export const setupCronJobs = () => {

@@ -1,16 +1,12 @@
 import app from './app';
 import dotenv from 'dotenv';
-import { PrismaClient } from '@prisma/client';
-import { PrismaPg } from '@prisma/adapter-pg';
-import { Pool } from 'pg';
+import { prisma } from './lib/prisma';
 import { setupCronJobs } from './jobs/cronJobs';
 
 dotenv.config();
 
 const PORT = process.env.PORT || 5000;
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-const adapter = new PrismaPg(pool);
-export const prisma: any = new PrismaClient({ adapter });
+
 
 const startServer = async () => {
   try {

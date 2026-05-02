@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getCustomers, getCustomerById, createCustomer, addUdharTransaction, payUdhar, revertTransaction } from '../controllers/customerController';
+import { getCustomers, getCustomerById, createCustomer, addUdharTransaction, payUdhar, revertTransaction, paySpecificTransaction } from '../controllers/customerController';
 import { protect, authorizeAdmin } from '../middlewares/authMiddleware';
 
 const router = Router();
@@ -16,5 +16,6 @@ router.route('/:id')
 router.post('/transaction', addUdharTransaction);
 router.delete('/transaction/:transactionId', revertTransaction);
 router.post('/pay', payUdhar);
+router.post('/pay-transaction/:id', paySpecificTransaction);
 
 export default router;

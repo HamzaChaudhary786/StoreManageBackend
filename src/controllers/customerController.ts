@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { prisma } from '../server';
+import { prisma } from '../lib/prisma';
 import { catchAsync } from '../utils/catchAsync';
 
 export const getCustomers = catchAsync(async (req: Request, res: Response) => {
@@ -114,6 +114,44 @@ export const payUdhar = catchAsync(async (req: Request, res: Response) => {
   });
 
   res.json({ message: 'Payment recorded successfully' });
+});
+
+export const paySpecificTransaction = catchAsync(async (req: Request, res: Response) => {
+  const { id } = req.params;
+
+  const transaction = await prisma.udharTransaction.findUnique({
+    where: { id },
+    include: { items: { include: { product: true } } }
+  });
+
+  if (!transaction) { res.status(404); throw new Error('Transaction not found'); }
+  if (transaction.isPaid) { res.status(400); throw new Error('Transaction is already marked as paid'); }
+
+  await prisma.$transaction(async (tx: any) => {
+    // 1. Mark transaction as paid
+    await tx.udharTransaction.update({
+      where: { id },
+      data: { isPaid: true }
+    });
+
+    // 2. Decrement customer balance
+    await tx.customer.update({
+      where: { id: transaction.customerId },
+      data: { currentBalance: { decrement: transaction.totalAmount } }
+    });
+
+    // 3. Log payment
+    const itemSummary = transaction.items.map((i: any) => i.product.name).join(', ');
+    await tx.paymentLog.create({
+      data: { 
+        customerId: transaction.customerId, 
+        amount: transaction.totalAmount, 
+        note: `Paid for transaction: ${itemSummary || transaction.description || 'Udhar Purchase'}`
+      }
+    });
+  });
+
+  res.json({ message: 'Transaction marked as paid successfully' });
 });
 
 export const revertTransaction = catchAsync(async (req: Request, res: Response) => {

@@ -6,7 +6,10 @@ export const errorHandler = (
   res: Response,
   next: NextFunction
 ) => {
-  const statusCode = err.statusCode || 500;
+  let statusCode = err.statusCode || res.statusCode;
+  
+  // If status is still 200, default to 500
+  if (statusCode === 200) statusCode = 500;
   
   res.status(statusCode).json({
     message: err.message || 'Server Error',

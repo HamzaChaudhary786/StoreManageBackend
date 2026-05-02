@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { prisma } from '../server';
+import { prisma } from '../lib/prisma';
 import { catchAsync } from '../utils/catchAsync';
 import ExcelJS from 'exceljs';
 
