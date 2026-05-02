@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getCustomers, getCustomerById, createCustomer, addUdharTransaction, payUdhar, revertTransaction, paySpecificTransaction } from '../controllers/customerController';
+import { getCustomers, getCustomerById, createCustomer, addUdharTransaction, payUdhar, revertTransaction, paySpecificTransaction, deleteCustomer } from '../controllers/customerController';
 import { protect, authorizeAdmin } from '../middlewares/authMiddleware';
 
 const router = Router();
@@ -11,7 +11,8 @@ router.route('/')
   .post(createCustomer);
 
 router.route('/:id')
-  .get(getCustomerById);
+  .get(getCustomerById)
+  .delete(deleteCustomer);
 
 router.post('/transaction', addUdharTransaction);
 router.delete('/transaction/:transactionId', revertTransaction);

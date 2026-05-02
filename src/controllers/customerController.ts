@@ -191,3 +191,30 @@ export const revertTransaction = catchAsync(async (req: Request, res: Response) 
 
   res.json({ message: 'Transaction reverted and stock restored' });
 });
+export const deleteCustomer = catchAsync(async (req: Request, res: Response) => {
+  const { id } = req.params;
+
+  const customer = await prisma.customer.findUnique({
+    where: { id },
+    include: { _count: { select: { udharTransactions: true } } }
+  });
+
+  if (!customer) {
+    res.status(404);
+    throw new Error('Customer not found');
+  }
+
+  // Optional: Prevent deletion if they have unpaid transactions?
+  // User didn't specify, but usually it's safer.
+  // For now, I'll allow it but delete everything related.
+
+  await prisma.$transaction(async (tx: any) => {
+    // Delete related data
+    await tx.udharItem.deleteMany({ where: { udharTransaction: { customerId: id } } });
+    await tx.udharTransaction.deleteMany({ where: { customerId: id } });
+    await tx.paymentLog.deleteMany({ where: { customerId: id } });
+    await tx.customer.delete({ where: { id } });
+  });
+
+  res.status(204).json({ status: 'success' });
+});

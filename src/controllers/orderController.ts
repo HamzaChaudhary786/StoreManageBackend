@@ -114,3 +114,43 @@ export const getSalesHistory = catchAsync(async (req: Request, res: Response) =>
   });
   res.json(transactions);
 });
+export const revertCashSale = catchAsync(async (req: Request, res: Response) => {
+  const { id } = req.params;
+
+  const order = await prisma.order.findUnique({
+    where: { id },
+    include: { items: true }
+  });
+
+  if (!order) {
+    res.status(404);
+    throw new Error('Order not found');
+  }
+
+  await prisma.$transaction(async (tx: any) => {
+    // 1. Restore Stock
+    for (const item of order.items) {
+      await tx.product.update({
+        where: { id: item.productId },
+        data: { stock: { increment: item.quantity } }
+      });
+
+      const product = await tx.product.findUnique({ where: { id: item.productId } });
+      await tx.stockLog.create({
+        data: {
+          productId: item.productId,
+          change: item.quantity,
+          previous: (product?.stock || 0) - item.quantity,
+          current: product?.stock || 0,
+          reason: `REVERT_CASH_ORDER_${order.id}`
+        }
+      });
+    }
+
+    // 2. Delete Order Items and Order
+    await tx.orderItem.deleteMany({ where: { orderId: id } });
+    await tx.order.delete({ where: { id } });
+  });
+
+  res.json({ message: 'Cash sale reverted and stock restored' });
+});
