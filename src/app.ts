@@ -14,13 +14,22 @@ import orderRoutes from './routes/orderRoutes';
 const app: Express = express();
 
 // Middlewares
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow all origins for mobile apps and specifically allow our frontend
+    callback(null, true);
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
+  exposedHeaders: ['Set-Cookie']
+}));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(cors({
-  origin: true, // Allow all origins to connect (necessary for mobile apps)
-  credentials: true
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" }
 }));
-app.use(helmet());
 app.use(morgan('dev'));
 app.use(cookieParser());
 
