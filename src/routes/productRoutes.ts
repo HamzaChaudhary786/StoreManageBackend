@@ -8,7 +8,7 @@ const router = Router();
 
 // Configure multer for CSV uploads
 const upload = multer({
-  dest: 'uploads/',
+  dest: '/tmp',
   fileFilter: (req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase();
     if (ext !== '.csv') {
