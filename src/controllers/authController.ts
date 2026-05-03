@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../lib/prisma';
 import { catchAsync } from '../utils/catchAsync';
@@ -13,10 +13,25 @@ const generateTokens = (adminId: string) => {
 export const login = catchAsync(async (req: Request, res: Response, next: NextFunction) => {
   const { email, password } = req.body;
   
-  const admin = await prisma.admin.findUnique({ where: { email } });
-  if (!admin || !(await bcrypt.compare(password, admin.password))) {
+  if (!email || !password) {
+    res.status(400);
+    throw new Error('Email and password are required');
+  }
+
+  // Case-insensitive email search
+  const admin = await prisma.admin.findUnique({ 
+    where: { email: email.toLowerCase().trim() } 
+  });
+
+  if (!admin) {
     res.status(401);
-    throw new Error('Invalid admin credentials');
+    throw new Error('No account found with this email');
+  }
+
+  const isMatch = await bcrypt.compare(password, admin.password);
+  if (!isMatch) {
+    res.status(401);
+    throw new Error('Invalid password');
   }
   
   const { accessToken, refreshToken } = generateTokens(admin.id);
