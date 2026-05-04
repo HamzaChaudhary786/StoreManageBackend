@@ -9,7 +9,7 @@ export const getProducts = catchAsync(async (req: Request, res: Response) => {
   const keyword = req.query.keyword as string;
   const categoryId = req.query.category as string;
   const stockStatus = req.query.stockStatus as string;
-  
+
   const where: any = {};
 
   if (keyword) {
@@ -24,7 +24,10 @@ export const getProducts = catchAsync(async (req: Request, res: Response) => {
   }
 
   if (categoryId) where.categoryId = categoryId;
-  if (stockStatus === 'out') where.stock = 0;
+
+  if (stockStatus === 'out') {
+    where.stock = 0;
+  }
 
   const products = await prisma.product.findMany({
     where,
@@ -32,8 +35,14 @@ export const getProducts = catchAsync(async (req: Request, res: Response) => {
     orderBy: { updatedAt: 'desc' }
   });
 
+  // Filter for low stock in memory since it depends on a per-product minStockLevel column comparison
+  let filteredProducts = products;
+  if (stockStatus === 'low') {
+    filteredProducts = products.filter(p => p.stock > 0 && p.stock <= (p.minStockLevel || 5));
+  }
+
   // Correct profit: accounts for piecesPerUnit in bulk-to-retail items
-  const productsWithProfit = products.map((p: { piecesPerUnit: number; buyPrice: number; salePrice: number; }) => {
+  const productsWithProfit = filteredProducts.map((p: any) => {
     const costPerRetailUnit = p.piecesPerUnit > 1 ? p.buyPrice / p.piecesPerUnit : p.buyPrice;
     const profit = p.salePrice - costPerRetailUnit;
     const profitMargin = costPerRetailUnit > 0 ? (profit / costPerRetailUnit) * 100 : 0;
@@ -45,7 +54,7 @@ export const getProducts = catchAsync(async (req: Request, res: Response) => {
 
 export const getProductById = catchAsync(async (req: Request, res: Response) => {
   const product = await prisma.product.findUnique({
-    where: { id: req.params.id },
+    where: { id: req.params.id as string },
     include: { category: true, stockLogs: { take: 10, orderBy: { createdAt: 'desc' } } }
   });
 
@@ -60,15 +69,15 @@ export const getProductById = catchAsync(async (req: Request, res: Response) => 
 
 export const createProduct = catchAsync(async (req: Request, res: Response) => {
   const { name, description, sku, buyPrice, salePrice, stock, minStockLevel, categoryId, images, unit, piecesPerUnit } = req.body;
-  
+
   const product = await prisma.product.create({
-    data: { 
-      name, description, sku, 
-      buyPrice: parseFloat(buyPrice), 
-      salePrice: parseFloat(salePrice), 
+    data: {
+      name, description, sku,
+      buyPrice: parseFloat(buyPrice),
+      salePrice: parseFloat(salePrice),
       stock: parseFloat(stock) || 0,
       minStockLevel: parseFloat(minStockLevel) || 5,
-      categoryId, 
+      categoryId,
       images: images || [],
       unit: unit || 'pcs',
       piecesPerUnit: parseInt(piecesPerUnit) || 1
@@ -86,11 +95,11 @@ export const createProduct = catchAsync(async (req: Request, res: Response) => {
 
 export const updateProduct = catchAsync(async (req: Request, res: Response) => {
   const { name, description, sku, buyPrice, salePrice, minStockLevel, categoryId, images, unit, piecesPerUnit } = req.body;
-  
+
   const product = await prisma.product.update({
-    where: { id: req.params.id },
-    data: { 
-      name, description, sku, 
+    where: { id: req.params.id as string },
+    data: {
+      name, description, sku,
       buyPrice: parseFloat(buyPrice),
       salePrice: parseFloat(salePrice),
       minStockLevel: parseFloat(minStockLevel) || 5,
@@ -105,7 +114,7 @@ export const updateProduct = catchAsync(async (req: Request, res: Response) => {
 
 export const updateStock = catchAsync(async (req: Request, res: Response) => {
   const { change, reason } = req.body;
-  const productId = req.params.id;
+  const productId = req.params.id as string;
 
   const currentProduct = await prisma.product.findUnique({ where: { id: productId } });
   if (!currentProduct) { res.status(404); throw new Error('Product not found'); }
@@ -130,7 +139,7 @@ export const updateStock = catchAsync(async (req: Request, res: Response) => {
 });
 
 export const deleteProduct = catchAsync(async (req: Request, res: Response) => {
-  await prisma.product.delete({ where: { id: req.params.id } });
+  await prisma.product.delete({ where: { id: req.params.id as string } });
   res.json({ message: 'Product removed' });
 });
 
@@ -155,7 +164,7 @@ export const bulkImportProducts = catchAsync(async (req: Request, res: Response)
 export const switchCategory = catchAsync(async (req: Request, res: Response) => {
   const { categoryId } = req.body;
   const product = await prisma.product.update({
-    where: { id: req.params.id },
+    where: { id: req.params.id as string },
     data: { categoryId }
   });
   res.json(product);
@@ -193,11 +202,13 @@ export const bulkCSVUpload = catchAsync(async (req: Request, res: Response) => {
     throw new Error('CSV file is empty');
   }
 
-  // Fetch all categories once for mapping
-  const allCategories = await prisma.category.findMany();
-  const catMap = new Map(allCategories.map(c => [c.name.toLowerCase(), c.id]));
+  console.log(`[Bulk Import] Starting processing of ${results.length} rows...`);
 
-  const createdCount = await prisma.$transaction(async (tx) => {
+  const createdCount = await prisma.$transaction(async (tx: any) => {
+    // Fetch categories inside transaction to ensure we have the latest
+    const allCategories = await tx.category.findMany();
+    const catMap = new Map(allCategories.map((c: any) => [c.name.toLowerCase(), c.id]));
+
     let count = 0;
     for (const row of results) {
       // Basic validation and mapping
@@ -222,36 +233,72 @@ export const bulkCSVUpload = catchAsync(async (req: Request, res: Response) => {
         catMap.set(categoryName.toLowerCase(), categoryId);
       }
 
-      const product = await tx.product.create({
-        data: {
-          name,
-          sku,
-          description: row.Description || row.description || '',
-          buyPrice,
-          salePrice,
-          stock,
-          categoryId,
-          unit,
-          piecesPerUnit,
-          minStockLevel: parseFloat(row.MinStock || row.min_stock) || 5,
-        }
-      });
+      const productData = {
+        name,
+        sku: sku || null,
+        description: row.Description || row.description || '',
+        buyPrice,
+        salePrice,
+        stock,
+        categoryId: categoryId || '',
+        unit,
+        piecesPerUnit,
+        minStockLevel: parseFloat(row.MinStock || row.min_stock) || 5,
+      };
 
-      if (product.stock > 0) {
-        await tx.stockLog.create({
-          data: {
-            productId: product.id,
-            change: product.stock,
-            previous: 0,
-            current: product.stock,
-            reason: 'BULK_IMPORT'
-          }
+      let product;
+      let existingProduct = null;
+
+      if (sku) {
+        existingProduct = await tx.product.findUnique({ where: { sku } });
+      }
+
+      if (existingProduct) {
+        // Update existing product
+        product = await tx.product.update({
+          where: { id: existingProduct.id },
+          data: productData
         });
+
+        // Log stock change if any
+        const stockChange = stock - existingProduct.stock;
+        if (stockChange !== 0) {
+          await tx.stockLog.create({
+            data: {
+              productId: product.id,
+              change: stockChange,
+              previous: existingProduct.stock,
+              current: product.stock,
+              reason: 'BULK_IMPORT_UPDATE'
+            }
+          });
+        }
+      } else {
+        // Create new product
+        product = await tx.product.create({
+          data: productData
+        });
+
+        if (product.stock > 0) {
+          await tx.stockLog.create({
+            data: {
+              productId: product.id,
+              change: product.stock,
+              previous: 0,
+              current: product.stock,
+              reason: 'BULK_IMPORT'
+            }
+          });
+        }
       }
       count++;
     }
     return count;
+  }, {
+    timeout: 60000 // 60 seconds for bulk operations
   });
+
+  console.log(`[Bulk Import] Successfully imported ${createdCount} products.`);
 
   res.status(201).json({
     message: `Successfully imported ${createdCount} products`,

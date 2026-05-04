@@ -118,7 +118,7 @@ export const revertCashSale = catchAsync(async (req: Request, res: Response) => 
   const { id } = req.params;
 
   const order = await prisma.order.findUnique({
-    where: { id },
+    where: { id: id as string },
     include: { items: true }
   });
 
@@ -148,8 +148,8 @@ export const revertCashSale = catchAsync(async (req: Request, res: Response) => 
     }
 
     // 2. Delete Order Items and Order
-    await tx.orderItem.deleteMany({ where: { orderId: id } });
-    await tx.order.delete({ where: { id } });
+    await tx.orderItem.deleteMany({ where: { orderId: id as string } });
+    await tx.order.delete({ where: { id: id as string } });
   });
 
   res.json({ message: 'Cash sale reverted and stock restored' });

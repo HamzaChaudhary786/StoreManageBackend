@@ -28,7 +28,7 @@ export const updateCategory = catchAsync(async (req: Request, res: Response) => 
   const { name, description } = req.body;
 
   const category = await prisma.category.update({
-    where: { id },
+    where: { id: id as string },
     data: { name, description }
   });
 
@@ -40,7 +40,7 @@ export const deleteCategory = catchAsync(async (req: Request, res: Response) => 
 
   // Check if category has products
   const category = await prisma.category.findUnique({
-    where: { id },
+    where: { id: id as string },
     include: { _count: { select: { products: true } } }
   });
 
@@ -53,7 +53,7 @@ export const deleteCategory = catchAsync(async (req: Request, res: Response) => 
   }
 
   await prisma.category.delete({
-    where: { id }
+    where: { id: id as string }
   });
 
   res.status(204).json({ status: 'success' });

@@ -92,14 +92,13 @@ export const getDashboardStats = catchAsync(async (req: Request, res: Response) 
 export const getSalesReportData = catchAsync(async (req: Request, res: Response) => {
   const { startDate, endDate } = req.query;
 
+  // Use provided boundaries strictly, or fallback to server "today"
   const start = startDate ? new Date(startDate as string) : new Date();
   const end = endDate ? new Date(endDate as string) : new Date();
 
+  // Only apply default hours if NOT provided as a full ISO string/custom date
   if (!startDate) start.setHours(0, 0, 0, 0);
-  else start.setHours(0, 0, 0, 0);
-
   if (!endDate) end.setHours(23, 59, 59, 999);
-  else end.setHours(23, 59, 59, 999);
 
   const [cashSales, udharSales] = await Promise.all([
     prisma.order.findMany({
@@ -122,7 +121,14 @@ export const getSalesReportData = catchAsync(async (req: Request, res: Response)
       customer: 'Walk-in',
       total: s.totalAmount,
       profit: calcSaleProfit(s.items as unknown as OrderItem[]),
-      items: s.items.map((i: any) => `${i.product.name} (${i.quantity} ${i.product.unit})`).join(', ')
+      items: s.items.map((i: any) => `${i.product.name} (${i.quantity} ${i.product.unit})`).join(', '),
+      itemDetails: s.items.map((i: any) => ({
+        name: i.product.name,
+        quantity: i.quantity,
+        unit: i.product.unit,
+        price: i.priceAtTime,
+        total: i.priceAtTime * i.quantity
+      }))
     })),
     ...udharSales.map((s: any) => ({
       id: s.id,
@@ -131,7 +137,14 @@ export const getSalesReportData = catchAsync(async (req: Request, res: Response)
       customer: s.customer.name,
       total: s.totalAmount,
       profit: calcSaleProfit(s.items as unknown as OrderItem[]),
-      items: s.items.map((i: any) => `${i.product.name} (${i.quantity} ${i.product.unit})`).join(', ')
+      items: s.items.map((i: any) => `${i.product.name} (${i.quantity} ${i.product.unit})`).join(', '),
+      itemDetails: s.items.map((i: any) => ({
+        name: i.product.name,
+        quantity: i.quantity,
+        unit: i.product.unit,
+        price: i.priceAtTime,
+        total: i.priceAtTime * i.quantity
+      }))
     }))
   ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
@@ -147,7 +160,6 @@ export const exportSalesReport = catchAsync(async (req: Request, res: Response) 
 
   if (startDate) {
     start = new Date(startDate as string);
-    start.setHours(0, 0, 0, 0);
   } else if (period === 'week') {
     start.setDate(start.getDate() - 7);
   } else if (period === 'month') {
@@ -156,7 +168,6 @@ export const exportSalesReport = catchAsync(async (req: Request, res: Response) 
 
   if (endDate) {
     end = new Date(endDate as string);
-    end.setHours(23, 59, 59, 999);
   }
 
   const [cashSales, udharSales] = await Promise.all([
@@ -184,11 +195,12 @@ export const exportSalesReport = catchAsync(async (req: Request, res: Response) 
 
   // Cash Sales
   cashSales.forEach((order: any) => {
+    const itemDetails = order.items.map((i: any) => `${i.product.name} (${i.quantity} ${i.product.unit})`).join(' | ');
     sheet.addRow({
       date: order.createdAt.toLocaleString(),
       type: 'CASH',
       customer: 'Walk-in',
-      items: order.items.map((i: any) => `${i.product.name} (${i.quantity} ${i.product.unit})`).join(', '),
+      items: itemDetails,
       total: order.totalAmount,
       profit: calcSaleProfit(order.items as unknown as OrderItem[])
     });
@@ -196,11 +208,12 @@ export const exportSalesReport = catchAsync(async (req: Request, res: Response) 
 
   // Udhar Sales
   udharSales.forEach((tx: any) => {
+    const itemDetails = tx.items.map((i: any) => `${i.product.name} (${i.quantity} ${i.product.unit})`).join(' | ');
     sheet.addRow({
       date: tx.createdAt.toLocaleString(),
       type: 'UDHAR',
       customer: tx.customer.name,
-      items: tx.items.map((i: any) => `${i.product.name} (${i.quantity} ${i.product.unit})`).join(', '),
+      items: itemDetails,
       total: tx.totalAmount,
       profit: calcSaleProfit(tx.items as unknown as OrderItem[])
     });
@@ -226,6 +239,9 @@ export const exportSalesReport = catchAsync(async (req: Request, res: Response) 
 
 export const getNotifications = catchAsync(async (req: Request, res: Response) => {
   const notifications = await prisma.adminNotification.findMany({
+    where: {
+      type: { notIn: ['LOW_STOCK', 'OUT_OF_STOCK'] }
+    },
     orderBy: { createdAt: 'desc' },
     take: 30
   });
@@ -234,7 +250,7 @@ export const getNotifications = catchAsync(async (req: Request, res: Response) =
 
 export const markAsRead = catchAsync(async (req: Request, res: Response) => {
   await prisma.adminNotification.update({
-    where: { id: req.params.id },
+    where: { id: req.params.id as string },
     data: { isRead: true }
   });
   res.json({ success: true });

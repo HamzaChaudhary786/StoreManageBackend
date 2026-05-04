@@ -19,7 +19,7 @@ export const getCustomers = catchAsync(async (req: Request, res: Response) => {
 
 export const getCustomerById = catchAsync(async (req: Request, res: Response) => {
   const customer = await prisma.customer.findUnique({
-    where: { id: req.params.id },
+    where: { id: req.params.id as string },
     include: {
       udharTransactions: {
         include: { items: { include: { product: true } } },
@@ -158,7 +158,7 @@ export const paySpecificTransaction = catchAsync(async (req: Request, res: Respo
   const { id } = req.params;
 
   const transaction = await prisma.udharTransaction.findUnique({
-    where: { id },
+    where: { id: id as string },
     include: { items: { include: { product: true } } }
   });
 
@@ -168,7 +168,7 @@ export const paySpecificTransaction = catchAsync(async (req: Request, res: Respo
   await prisma.$transaction(async (tx: any) => {
     // 1. Mark transaction as paid
     await tx.udharTransaction.update({
-      where: { id },
+      where: { id: id as string },
       data: { isPaid: true }
     });
 
@@ -196,7 +196,7 @@ export const revertTransaction = catchAsync(async (req: Request, res: Response) 
   const { transactionId } = req.params;
 
   const transaction = await prisma.udharTransaction.findUnique({
-    where: { id: transactionId },
+    where: { id: transactionId as string },
     include: { items: true }
   });
 
@@ -223,8 +223,8 @@ export const revertTransaction = catchAsync(async (req: Request, res: Response) 
     await tx.customer.update({ where: { id: transaction.customerId }, data: { currentBalance: { decrement: transaction.totalAmount } } });
 
     // 3. Delete Transaction
-    await tx.udharItem.deleteMany({ where: { udharTransactionId: transactionId } });
-    await tx.udharTransaction.delete({ where: { id: transactionId } });
+    await tx.udharItem.deleteMany({ where: { udharTransactionId: transactionId as string } });
+    await tx.udharTransaction.delete({ where: { id: transactionId as string } });
   });
 
   res.json({ message: 'Transaction reverted and stock restored' });
@@ -233,7 +233,7 @@ export const deleteCustomer = catchAsync(async (req: Request, res: Response) => 
   const { id } = req.params;
 
   const customer = await prisma.customer.findUnique({
-    where: { id },
+    where: { id: id as string },
     include: { _count: { select: { udharTransactions: true } } }
   });
 
@@ -248,10 +248,10 @@ export const deleteCustomer = catchAsync(async (req: Request, res: Response) => 
 
   await prisma.$transaction(async (tx: any) => {
     // Delete related data
-    await tx.udharItem.deleteMany({ where: { udharTransaction: { customerId: id } } });
-    await tx.udharTransaction.deleteMany({ where: { customerId: id } });
-    await tx.paymentLog.deleteMany({ where: { customerId: id } });
-    await tx.customer.delete({ where: { id } });
+    await tx.udharItem.deleteMany({ where: { udharTransaction: { customerId: id as string } } });
+    await tx.udharTransaction.deleteMany({ where: { customerId: id as string } });
+    await tx.paymentLog.deleteMany({ where: { customerId: id as string } });
+    await tx.customer.delete({ where: { id: id as string } });
   });
 
   res.status(204).json({ status: 'success' });
@@ -260,7 +260,7 @@ export const updateCustomer = catchAsync(async (req: Request, res: Response) => 
   const { id } = req.params;
   const { name, phone, address } = req.body;
 
-  const customer = await prisma.customer.findUnique({ where: { id } });
+  const customer = await prisma.customer.findUnique({ where: { id: id as string } });
   if (!customer) {
     res.status(404);
     throw new Error('Customer not found');
@@ -276,7 +276,7 @@ export const updateCustomer = catchAsync(async (req: Request, res: Response) => 
   }
 
   const updated = await prisma.customer.update({
-    where: { id },
+    where: { id: id as string },
     data: { name, phone, address }
   });
 
